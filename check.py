@@ -10,6 +10,8 @@ CL_BLUE = '\033[1;34m'
 CL_PURPLE = '\033[1;34m'
 CL_NONE = '\033[0m'
 
+DELETE_MANIPULATOR = 'del'
+
 class Student(object):
 	def __init__(self, stuid, name, line_in_names, pt=''):
 		self._stuid = stuid
@@ -112,20 +114,33 @@ def give_points(students, stuid, score, check_seq, fj):
 	stu = students[stuid]
 	if stu.has_pt():
 		delta_seq = check_seq - stu.check_seq
-		cmd = input(' %sFatal: Student %s %s already has score %s%s %s%d%s checks ago! overwrite?%s [y/N]: ' % (CL_RED, stuid, stu._name, CL_GREEN, stu._pt, CL_YELLOW, delta_seq, CL_RED, CL_NONE))
+		cmd = input(' %sFatal: Student %s %s already has score %s%s %s%d%s checks ago! %s?%s [y/N]: ' % (CL_RED, stuid, stu._name, CL_GREEN, stu._pt, CL_YELLOW, delta_seq, CL_RED, score and 'overwrite' or 'delete', CL_NONE))
 		if cmd == 'y' or cmd == 'Y':
-			fj.write('%s Overwrite %s %s: %s->%s\n' % (timestr, stuid, stu._name, stu._pt, score))
-			print(' %sOverwrite %s %s: %s%s%s->%s%s%s' % (CL_PURPLE, stuid, stu._name, CL_RED, stu._pt, CL_PURPLE, CL_GREEN, score, CL_NONE))
+			if not score:
+				fj.write('%s Delete %s %s: %s\n' % (timestr, stuid, stu._name, stu._pt))
+				print(' %sDelete %s %s: %s%s%s' % (CL_PURPLE, stuid, stu._name, CL_RED, stu._pt, CL_NONE))
+			else:
+				fj.write('%s Overwrite %s %s: %s->%s\n' % (timestr, stuid, stu._name, stu._pt, score))
+				print(' %sOverwrite %s %s: %s%s%s->%s%s%s' % (CL_PURPLE, stuid, stu._name, CL_RED, stu._pt, CL_PURPLE, CL_GREEN, score, CL_NONE))
+			updated = True
+			stu.set_pt(score, check_seq)
+		else:
+			if not score:
+				fj.write('%s Skipped deletion for student %s %s, who already has score %s %d checks ago.\n' % (timestr, stuid, stu._name, stu._pt, delta_seq))
+				print(' %sSkipped deletion for student %s %s, who already has score %s%s %s%d%s checks ago.%s' % (CL_PURPLE, stuid, stu._name, CL_GREEN, stu._pt, CL_YELLOW, delta_seq, CL_PURPLE, CL_NONE))
+			else:
+				fj.write('%s Skipped score %s for the same student %s %s, who already has score %s %d checks ago.\n' % (timestr, score, stuid, stu._name, stu._pt, delta_seq))
+				print(' %sSkipped score %s%s%s for student %s %s, who already has score %s%s %s%d%s checks ago.%s' % (CL_PURPLE, CL_RED, score, CL_PURPLE, stuid, stu._name, CL_GREEN, stu._pt, CL_YELLOW, delta_seq, CL_PURPLE, CL_NONE))
+	else:
+		if not score:
+			fj.write('%s Skipped deletion for student %s %s, who has no score recorded.\n' % (timestr, stuid, stu._name))
+			print(' %sSkipped deletion for student %s %s, who has no score recored.%s' % (CL_PURPLE, stuid, stu._name, CL_NONE))
+			stu.set_pt(score, check_seq)
+		else:
+			fj.write('%s Give %s %s: %s\n' % (timestr, stuid, stu._name, score))
+			print(' %sGive %s %s: %s%s%s' % (CL_YELLOW, stuid, stu._name, CL_GREEN, score, CL_NONE))
 			stu.set_pt(score, check_seq)
 			updated = True
-		else:
-			fj.write('%s Skpped score %s for the same student %s %s, who already has score %s %d checks ago.\n' % (timestr, score, stuid, stu._name, stu._pt, delta_seq))
-			print(' %sSkpped score %s%s%s for student %s %s, who already has score %s%s %s%d%s checks ago.%s' % (CL_PURPLE, CL_RED, score, CL_PURPLE, stuid, stu._name, CL_GREEN, stu._pt, CL_YELLOW, delta_seq, CL_PURPLE, CL_NONE))
-	else:
-		fj.write('%s Give %s %s: %s\n' % (timestr, stuid, stu._name, score))
-		print(' %sGive %s %s: %s%s%s' % (CL_YELLOW, stuid, stu._name, CL_GREEN, score, CL_NONE))
-		stu.set_pt(score, check_seq)
-		updated = True
 
 	fj.flush()
 	return updated
@@ -157,6 +172,10 @@ def main_loop(students):
 
 		if len(cmd) == 2:
 			candidates = find_student(students, cmd[0])
+
+			# Override delete command with empty score
+			if cmd[1].lower() == DELETE_MANIPULATOR:	cmd[1] = ''
+
 			if len(candidates) == 0:
 				loosen_candidates = find_student(students, cmd[0], True)
 				if len(loosen_candidates) == 0:
